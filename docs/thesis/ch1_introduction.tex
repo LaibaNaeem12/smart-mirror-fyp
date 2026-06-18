@@ -1,0 +1,141 @@
+\chapter{Introduction}
+\label{ch:introduction}
+
+\section{Background}
+\label{sec:background}
+
+Virtual try-on (VTON) is a computer vision and generative AI application that allows users to visualize how a garment would look on their body without physically wearing it. The technology has gained significant commercial traction in the fashion retail industry, where \textit{smart mirrors}---large interactive displays equipped with cameras---enable shoppers to preview outfits in stores, malls, and trade exhibitions.
+
+Traditional fitting rooms create bottlenecks during peak shopping hours, increase inventory handling costs, and limit the number of garments a customer can try in a single visit. Virtual try-on addresses these limitations by digitizing the fitting experience. However, deploying state-of-the-art VTON in production environments presents substantial engineering challenges:
+
+\begin{itemize}[leftmargin=*]
+  \item Neural inference on shared GPU clouds is \textbf{slow and queue-dependent}, with unpredictable wall-clock latency.
+  \item Model outputs are \textbf{not guaranteed} to be valid try-on composites; models may return unchanged person images, raw garment images, or corrupted data.
+  \item Kiosk software must handle \textbf{many sequential users} without cross-session UI corruption from stale asynchronous jobs.
+  \item Exhibition and retail deployments require \textbf{continuous uptime} where downtime is unacceptable.
+\end{itemize}
+
+\section{Project Overview}
+\label{sec:project-overview}
+
+The \textbf{Smart Mirror AI Virtual Try-On System} is a full-stack web application designed to address these challenges. The system enables users to browse a digital garment catalog, capture a live webcam photograph, and receive a composite image approximating how the selected garment would appear on their body.
+
+The project comprises three major components:
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Frontend (React Kiosk):} A single-page application built with React 18, Vite 5, and Tailwind CSS 3, providing a guided kiosk flow with catalog browsing, camera capture, result display, and an optional AI stylist assistant.
+  \item \textbf{Backend (Node.js/Express):} An Express 5 server orchestrating catalog resolution, image preprocessing, Replicate cloud predictions, local compositing fallbacks, and output validation.
+  \item \textbf{Data Layer:} MongoDB for garment metadata storage and static PNG assets served from \texttt{frontend/public/dataset/}.
+\end{enumerate}
+
+The AI pipeline uses cloud-based diffusion try-on models (CATVTON-Flux and IDM-VTON via Replicate) as the primary inference path, supplemented by a multi-layer deterministic fallback chain for reliability.
+
+\section{Motivation}
+\label{sec:motivation}
+
+The motivation for this project stems from the gap between research-grade virtual try-on systems and deployable retail solutions. While academic VTON models achieve impressive visual quality, they are typically evaluated in controlled laboratory settings with dedicated GPU hardware. Real-world kiosk deployments face network variability, shared cloud GPU queues, and non-technical end users who expect immediate, reliable results.
+
+This project aims to bridge that gap by engineering a \textbf{reliability envelope} around cloud AI inference---combining generative quality with deterministic fallbacks, instant previews, session-safe async UI behavior, and strict output validation.
+
+\section{Scope of the Project}
+\label{sec:scope}
+
+The scope of this project includes:
+
+\begin{itemize}[leftmargin=*]
+  \item Design and implementation of a kiosk-style virtual try-on web application.
+  \item Integration with Replicate-hosted CATVTON-Flux and IDM-VTON models.
+  \item Development of a multi-layer exhibition fallback chain (ComfyUI, MoveNet pose overlay, Sharp compositing).
+  \item REST API design for catalog, try-on, and AI stylist services.
+  \item Session isolation and async prediction polling on the frontend.
+  \item MongoDB-based catalog management with offline mock fallback.
+\end{itemize}
+
+\textbf{Out of scope:} 3D body mesh reconstruction, physics-based cloth simulation, mobile application development, payment integration, and user account management.
+
+\section{Objectives}
+\label{sec:objectives}
+
+\subsection{Functional Objectives}
+
+\begin{table}[H]
+  \centering
+  \caption{Functional objectives of the Smart Mirror system}
+  \label{tab:functional-objectives}
+  \begin{tabular}{@{}clp{9cm}@{}}
+    \toprule
+    \textbf{ID} & \textbf{Objective} & \textbf{Description} \\
+    \midrule
+    F1 & Catalog browsing & Browse garments by gender and category with images from catalog API \\
+    F2 & Webcam capture & Capture live webcam frame and send to server as normalized data URL \\
+    F3 & Virtual try-on & Run virtual try-on using cloud AI and/or local fallbacks \\
+    F4 & Instant preview & Show immediate Sharp composite preview while async AI processes \\
+    F5 & Async polling & Poll async Replicate prediction until success or failure \\
+    F6 & Result display & Display one final validated processed image on result screen \\
+    F7 & AI stylist & Optional outfit suggestions via Ollama-powered stylist assistant \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Non-Functional Objectives}
+
+\begin{table}[H]
+  \centering
+  \caption{Non-functional objectives of the Smart Mirror system}
+  \label{tab:nonfunctional-objectives}
+  \begin{tabular}{@{}clp{9cm}@{}}
+    \toprule
+    \textbf{ID} & \textbf{Objective} & \textbf{Description} \\
+    \midrule
+    NF1 & Reliability & Bounded worst-case output via fallback chain and validation \\
+    NF2 & Session safety & Stale async jobs must not overwrite new user sessions \\
+    NF3 & Operability & Environment-driven model selection (CATVTON vs IDM-VTON) \\
+    NF4 & Security & API tokens and HuggingFace tokens kept server-side only \\
+    NF5 & Demonstrability & Exhibition mode hides failure-heavy UX for public demos \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Problem Statement}
+\label{sec:problem-statement}
+
+Design and implement a smart mirror system that:
+
+\begin{enumerate}[leftmargin=*]
+  \item Accepts a live person image and a catalog garment image as inputs.
+  \item Produces a plausible try-on result within acceptable demonstration latency.
+  \item Never breaks the kiosk user interface with null images, wrong images, or session bleed from prior users.
+  \item Continues operating when cloud AI is slow or fails, using deterministic local fallbacks.
+\end{enumerate}
+
+\section{Intended Users and Deployment Context}
+\label{sec:users}
+
+\begin{table}[H]
+  \centering
+  \caption{Deployment contexts for the Smart Mirror system}
+  \label{tab:deployment-context}
+  \begin{tabular}{@{}lp{10cm}@{}}
+    \toprule
+    \textbf{Context} & \textbf{Usage} \\
+    \midrule
+    Retail flagship store & Shoppers try outfits on a floor-standing smart mirror \\
+    Trade show / exhibition & Short sessions with network and GPU variability \\
+    College / lab demo & Development with mock catalog when MongoDB is offline \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Organization of the Report}
+\label{sec:organization}
+
+This report is organized as follows:
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Chapter 2} presents the background, literature survey, and technology choices.
+  \item \textbf{Chapter 3} describes the Software Requirements Specification (SRS).
+  \item \textbf{Chapter 4} covers system modeling, architecture, and implementation details.
+  \item \textbf{Chapter 5} discusses testing methodology, test cases, and validation results.
+  \item \textbf{Chapter 6} provides conclusions and directions for future work.
+  \item \textbf{Appendix} contains environment variables, API reference, and module dependency graphs.
+\end{itemize}

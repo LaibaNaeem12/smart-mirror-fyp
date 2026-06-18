@@ -1,0 +1,116 @@
+% Smart Mirror AI Virtual Try-On — Final Year Project Thesis
+% Compile: pdflatex main.tex (run twice for TOC/references)
+
+\documentclass[12pt,a4paper,oneside]{report}
+
+% ---------- Packages ----------
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=1in]{geometry}
+\usepackage{setspace}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{tabularx}
+\usepackage{multirow}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{amsmath}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{fancyhdr}
+\usepackage{titlesec}
+\usepackage{tocloft}
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  citecolor=blue,
+  urlcolor=blue,
+  pdftitle={Smart Mirror AI Virtual Try-On System},
+  pdfauthor={Student Name}
+}
+
+\onehalfspacing
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{6pt}
+
+% Code listings style
+\definecolor{codebg}{RGB}{245,245,245}
+\lstset{
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  rulecolor=\color{gray!40},
+  numbers=left,
+  numberstyle=\tiny\color{gray},
+  keywordstyle=\color{blue},
+  commentstyle=\color{green!50!black},
+  stringstyle=\color{red!70!black},
+  showstringspaces=false,
+  tabsize=2
+}
+
+% Chapter formatting
+\titleformat{\chapter}[display]
+  {\normalfont\huge\bfseries}{\chaptertitlename\ \thechapter}{20pt}{\Huge}
+\titlespacing*{\chapter}{0pt}{-20pt}{30pt}
+
+% Header/footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[R]{\small Smart Mirror AI Virtual Try-On System}
+\fancyfoot[C]{\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+% Custom commands — edit these before submission
+\newcommand{\thesistitle}{Smart Mirror AI Virtual Try-On System}
+\newcommand{\thesissubtitle}{An Interactive Kiosk-Based Garment Visualization Platform}
+\newcommand{\studentname}{[Your Full Name]}
+\newcommand{\rollnumber}{[Roll Number]}
+\newcommand{\department}{[Department of Computer Science / IT]}
+\newcommand{\college}{[College / University Name]}
+\newcommand{\supervisor}{[Guide / Supervisor Name]}
+\newcommand{\submissiondate}{June 2026}
+\newcommand{\degree}{Bachelor of Technology}
+\newcommand{\branch}{Computer Science and Engineering}
+
+\begin{document}
+
+% Roman numerals for front matter
+\pagenumbering{roman}
+
+\input{00_titlepage}
+\input{01_abstract}
+\input{02_certificate}
+\input{03_declaration}
+\input{04_plagiarism}
+
+\tableofcontents
+\listoffigures
+\listoftables
+\clearpage
+
+% Arabic numerals for main content
+\pagenumbering{arabic}
+\setcounter{page}{1}
+
+\input{ch1_introduction}
+\input{ch2_background}
+\input{ch3_srs}
+\input{ch4_system_modeling}
+\input{ch5_testing}
+\input{ch6_conclusion}
+
+\appendix
+\input{appendix}
+
+\input{references}
+
+\end{document}

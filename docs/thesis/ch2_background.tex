@@ -1,0 +1,100 @@
+\chapter{Background and Literature Survey}
+\label{ch:background}
+
+\section{Virtual Try-On Technology}
+\label{sec:vton-technology}
+
+Virtual try-on (VTON) is a subfield of computer vision and generative AI that synthesizes images of a person wearing a target garment. The problem is formally stated as: given a person image $I_p$ and a garment image $I_g$, produce a composite image $I_{out}$ such that the person in $I_{out}$ appears to be wearing the garment from $I_g$ while preserving identity, pose, and background.
+
+Early VTON approaches used geometric warping and thin-plate spline (TPS) transformations to deform garment images onto person silhouettes. While computationally efficient, these methods produced unrealistic results for complex poses and draping. Modern approaches leverage deep generative models, particularly Generative Adversarial Networks (GANs) and Diffusion Models, to achieve photorealistic try-on results.
+
+\section{Related Work}
+\label{sec:related-work}
+
+\subsection{Image-Based Virtual Try-On}
+
+\textbf{IDM-VTON} (Improved Diffusion Models for Virtual Try-On) represents a state-of-the-art image-based VTON approach that conditions diffusion model generation on both human and garment images. The model accepts a human image, a garment image, and a garment category (upper body, lower body, or dresses) to produce a try-on composite. IDM-VTON is available on Replicate as \texttt{cuuupid/idm-vton} and serves as one of the primary inference models in this project.
+
+\textbf{CATVTON-Flux} combines category-aware try-on with the FLUX diffusion architecture, producing higher-quality generative transfers compared to earlier GAN-based methods. It requires a Hugging Face token for FLUX license gating and is hosted on Replicate as \texttt{mmezhov/catvton-flux}.
+
+\subsection{2D Compositing Approaches}
+
+Traditional 2D compositing overlays a garment image onto a person photograph at a fixed torso region. While geometrically simplistic, 2D compositing offers deterministic latency (milliseconds on CPU) and guaranteed output---properties essential for kiosk reliability. The Sharp image processing library enables fast decode, resize, rotate, and alpha compositing on the Node.js server.
+
+\subsection{Pose-Guided Compositing}
+
+Pose estimation models such as \textbf{MoveNet} (TensorFlow.js) detect body keypoints including shoulders and hips. These keypoints enable garment alignment that adapts to the person's pose, producing more plausible composites than fixed-position overlays. MoveNet's SINGLEPOSE\_LIGHTNING variant runs on CPU without requiring CUDA, making it suitable for kiosk server deployment.
+
+\subsection{Workflow Engines}
+
+\textbf{ComfyUI} is a node-based workflow engine for running custom generative AI pipelines locally. While powerful for custom VTON workflows, ComfyUI is operationally heavy and intentionally optional in this project. When enabled, it serves as the second layer (L2) in the exhibition fallback chain.
+
+\section{Technology Choices}
+\label{sec:technology-choices}
+
+\subsection{Frontend: React with Vite}
+
+React 18 provides a component-based architecture suitable for the multi-step kiosk flow (gender selection, catalog browsing, camera capture, result display). Vite 5 offers fast development builds and optimized production bundles. Tailwind CSS 3 enables rapid UI styling with utility classes appropriate for kiosk touch interfaces.
+
+\subsection{Backend: Node.js with Express}
+
+Node.js provides a unified JavaScript runtime for both frontend and backend development. Express 5 handles HTTP routing, middleware, and JSON body parsing with a 25 MB limit for large base64 webcam images. The event-driven architecture suits the async prediction polling pattern.
+
+\subsection{Database: MongoDB}
+
+MongoDB stores garment metadata (name, gender, category, image URL, tags, price) while actual garment images remain on disk as static PNG files. This separation keeps the database lightweight and enables fast catalog queries with filtering by gender and category.
+
+\subsection{Cloud AI: Replicate}
+
+Replicate provides hosted, version-pinned ML models without requiring local GPU infrastructure. The standard prediction create-and-poll API fits the kiosk async user experience. Trade-offs include queue latency and non-deterministic wall-clock processing time.
+
+\subsection{Image Processing: Sharp}
+
+Sharp is a high-performance Node.js image processing library built on libvips. It provides deterministic CPU-side image operations essential for instant previews and guaranteed fallback output.
+
+\subsection{Pose Estimation: TensorFlow.js MoveNet}
+
+TensorFlow.js with the MoveNet pose detection model runs on CPU, detecting single-person body keypoints for shoulder/torso garment alignment without requiring CUDA on the kiosk server.
+
+\subsection{Optional: Ollama LLM}
+
+Ollama provides a local large language model interface for the optional AI stylist assistant, generating outfit recommendations through natural language interaction without external API dependencies.
+
+\section{Comparison of Approaches}
+\label{sec:comparison}
+
+\begin{table}[H]
+  \centering
+  \caption{Comparison of virtual try-on approaches used in this project}
+  \label{tab:approach-comparison}
+  \begin{tabular}{@{}lp{4.5cm}p{4.5cm}@{}}
+    \toprule
+    \textbf{Approach} & \textbf{Strengths} & \textbf{Role in Project} \\
+    \midrule
+    IDM-VTON (Diffusion) & High visual quality, category-aware & Primary Replicate model \\
+    CATVTON-Flux (Diffusion) & Superior generative quality & Optional primary model \\
+    2D Sharp compositing & Deterministic, instant & Preview + last-resort fallback \\
+    Pose-guided compositing & Pose-adaptive alignment & Exhibition fallback L3 \\
+    ComfyUI workflows & Custom local pipelines & Optional fallback L2 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Smart Mirror Systems in Industry}
+\label{sec:industry}
+
+Commercial smart mirror deployments exist in flagship retail stores (e.g., Rebecca Minkoff, Ralph Lauren) and trade show demonstrations. Common challenges reported in industry deployments include:
+
+\begin{itemize}[leftmargin=*]
+  \item GPU inference latency causing user abandonment during waits.
+  \item Model outputs that fail quality checks, showing incorrect composites.
+  \item Session management issues when multiple users interact sequentially.
+  \item Network dependency on cloud AI services in venues with unreliable connectivity.
+\end{itemize}
+
+This project directly addresses each of these challenges through its multi-layer fallback architecture, instant preview mechanism, and session isolation design.
+
+\section{Summary}
+\label{sec:background-summary}
+
+The background survey establishes that while generative VTON models achieve impressive visual quality, production kiosk deployments require additional engineering for reliability, latency management, and session safety. The technology choices in this project---Replicate for quality, Sharp and MoveNet for reliability, React for kiosk UX---reflect a pragmatic balance between visual fidelity and operational availability.

@@ -1,0 +1,180 @@
+\chapter{Appendix}
+\label{ch:appendix}
+
+\section{Backend Environment Variables}
+\label{app:backend-env}
+
+\begin{longtable}{@{}p{5.5cm}p{8cm}@{}}
+  \caption{Backend environment variables} \label{tab:backend-env} \\
+  \toprule
+  \textbf{Variable} & \textbf{Purpose} \\
+  \midrule
+  \endfirsthead
+  \multicolumn{2}{c}{\tablename\ \thetable\ -- continued} \\
+  \toprule
+  \textbf{Variable} & \textbf{Purpose} \\
+  \midrule
+  \endhead
+  \bottomrule
+  \endfoot
+  \texttt{PORT} & HTTP server port (default 5000) \\
+  \texttt{MONGO\_URI} & MongoDB connection string \\
+  \texttt{USE\_MOCK\_CATALOG\_WHEN\_DB\_UNAVAILABLE} & Serve embedded catalog if DB is down \\
+  \texttt{REPLICATE\_API\_TOKEN} & Replicate cloud API authentication \\
+  \texttt{REPLICATE\_TRYON\_MODEL} & Model reference \texttt{owner/name:version} \\
+  \texttt{REPLICATE\_TRYON\_PRIMARY} & \texttt{catvton} or \texttt{idm-vton} when model unset \\
+  \texttt{REPLICATE\_TRYON\_VERSION} & Version digest if model has no colon suffix \\
+  \texttt{REPLICATE\_CATVTON\_HF\_TOKEN} & HuggingFace token for CATVTON-Flux \\
+  \texttt{REPLICATE\_TRYON\_HUMAN\_FIELD} & IDM-VTON human image field name \\
+  \texttt{REPLICATE\_TRYON\_GARMENT\_FIELD} & IDM-VTON garment image field name \\
+  \texttt{REPLICATE\_TRYON\_CATEGORY} & Default garment region category \\
+  \texttt{REPLICATE\_TRYON\_TIMEOUT\_MS} & Overall poll deadline (default 420000 ms) \\
+  \texttt{TRY\_ON\_EXHIBITION\_COMPOSITE\_FALLBACK} & Enable exhibition chain (default true) \\
+  \texttt{TRY\_ON\_SMART\_POSE\_OVERLAY} & Enable MoveNet pose path (default true) \\
+  \texttt{TRY\_ON\_POSE\_MAX\_SIDE} & Maximum image side for pose detection \\
+  \texttt{TRY\_ON\_POSE\_MIN\_SCORE} & Minimum keypoint confidence score \\
+  \texttt{ENABLE\_COMFYUI} & Gate ComfyUI execution \\
+  \texttt{COMFY\_TRYON\_BRIDGE\_URL} & HTTP bridge URL for ComfyUI \\
+  \texttt{COMFYUI\_TRYON\_DIRECT} & Enable direct ComfyUI queue mode \\
+  \texttt{COMFYUI\_TRYON\_WORKFLOW\_FILE} & ComfyUI workflow JSON file path \\
+  \texttt{AI\_TRYON\_SERVICE\_URL} & External try-on worker override URL \\
+  \texttt{TRY\_ON\_FLOW\_DEBUG} & Verbose server-side debug logging \\
+  \texttt{OLLAMA\_BASE\_URL} & Ollama LLM server base URL \\
+  \texttt{OLLAMA\_MODEL} & Ollama model name for stylist assistant \\
+\end{longtable}
+
+\section{Frontend Environment Variables}
+\label{app:frontend-env}
+
+\begin{table}[H]
+  \centering
+  \caption{Frontend environment variables}
+  \label{tab:frontend-env}
+  \begin{tabular}{@{}lp{9cm}@{}}
+    \toprule
+    \textbf{Variable} & \textbf{Purpose} \\
+    \midrule
+    \texttt{VITE\_API\_BASE\_URL} & Backend server origin URL \\
+    \texttt{VITE\_EXHIBITION\_MODE} & Enable kiosk demo UX optimizations \\
+    \texttt{VITE\_TRY\_ON\_FLOW\_DEBUG} & Browser console debug logging \\
+    \texttt{VITE\_TRYON\_FALLBACK\_MS} & Fallback illusion timing in milliseconds \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{HTTP Status Mapping}
+\label{app:status-mapping}
+
+\begin{table}[H]
+  \centering
+  \caption{Try-on client status normalization}
+  \label{tab:status-mapping}
+  \begin{tabular}{@{}ll@{}}
+    \toprule
+    \textbf{Backend Inference Status} & \textbf{Normalized Client Status} \\
+    \midrule
+    \texttt{ok} & \texttt{success} \\
+    \texttt{passthrough} & \texttt{fallback} \\
+    \texttt{success} & \texttt{success} \\
+    Async initial response & \texttt{instant\_preview} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Module Dependency Graph}
+\label{app:module-graph}
+
+The try-on processing path follows this module dependency chain:
+
+\begin{lstlisting}[language={}, caption={Try-on module dependency graph}]
+tryonController
+  -> normalizeWebcamImage
+  -> optimizePersonImageForReplicate
+  -> createTryOnPrediction / runTryOnInference
+       -> replicateService
+            -> resolveExhibitionFinalImage
+                 -> comfyTryOnService (optional L2)
+                 -> tryOnSmartPoseOverlay (L3)
+                      -> tryOnDemoComposite (L4)
+                 -> tryOnFinalImageValidator
+\end{lstlisting}
+
+\section{Project Setup Instructions}
+\label{app:setup}
+
+\subsection{Backend Setup}
+
+\begin{lstlisting}[language=bash, caption={Backend installation and startup}]
+cd backend
+cp .env.example .env
+# Edit .env: set REPLICATE_API_TOKEN, MONGO_URI, etc.
+npm install
+npm start
+\end{lstlisting}
+
+\subsection{Frontend Setup}
+
+\begin{lstlisting}[language=bash, caption={Frontend installation and startup}]
+cd frontend
+cp .env.example .env
+# Edit .env: set VITE_API_BASE_URL=http://127.0.0.1:5000
+npm install
+npm run dev
+\end{lstlisting}
+
+\subsection{Production Build}
+
+\begin{lstlisting}[language=bash, caption={Frontend production build}]
+cd frontend
+npm run build
+npm run preview
+\end{lstlisting}
+
+\section{Key Source Files Reference}
+\label{app:source-files}
+
+\begin{table}[H]
+  \centering
+  \caption{Key source files in the Smart Mirror project}
+  \label{tab:source-files}
+  \small
+  \begin{tabular}{@{}lp{9cm}@{}}
+    \toprule
+    \textbf{File} & \textbf{Description} \\
+    \midrule
+    \texttt{backend/server.js} & Express application entry point \\
+    \texttt{backend/controllers/tryonController.js} & Try-on request orchestration \\
+    \texttt{backend/services/replicateService.js} & Replicate cloud AI integration \\
+    \texttt{backend/services/tryOnInferenceService.js} & ML routing and inference boundary \\
+    \texttt{backend/utils/tryOnExhibitionFallbackChain.js} & Multi-layer fallback chain \\
+    \texttt{backend/utils/tryOnFinalImageValidator.js} & Output image validation \\
+    \texttt{backend/utils/tryOnSmartPoseOverlay.js} & MoveNet pose-guided compositing \\
+    \texttt{backend/utils/tryOnDemoComposite.js} & Sharp center-overlay compositing \\
+    \texttt{backend/models/Cloth.js} & MongoDB garment schema \\
+    \texttt{frontend/src/pages/Home.jsx} & Main kiosk state machine \\
+    \texttt{frontend/src/components/flow/FlowResultStep.jsx} & Try-on result display \\
+    \texttt{frontend/src/components/flow/AutoWebcamCapture.jsx} & Webcam capture pipeline \\
+    \texttt{frontend/src/lib/tryOnExhibitionGuards.js} & Session isolation guards \\
+    \texttt{frontend/src/lib/exhibitionMode.js} & Exhibition mode configuration \\
+    \texttt{frontend/src/api/tryonApi.js} & Try-on API client with polling \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Screenshots Guide}
+\label{app:screenshots}
+
+For thesis submission, capture the following screenshots from a running kiosk session:
+
+\begin{enumerate}[leftmargin=*]
+  \item Gender selection screen.
+  \item Catalog browsing with category tabs.
+  \item Garment preview on mirror stage.
+  \item Webcam capture with countdown timer.
+  \item Instant Sharp preview during AI processing.
+  \item Final AI try-on result with crossfade.
+  \item AI stylist assistant panel with recommendation.
+  \item ``New Outfit'' reset flow.
+\end{enumerate}
+
+Save screenshots as PNG files in a \texttt{figures/} directory and include them using \texttt{\textbackslash includegraphics} in the relevant chapters.

@@ -1,0 +1,343 @@
+\chapter{System Modeling and Implementation}
+\label{ch:system-modeling}
+
+\section{System Architecture}
+\label{sec:architecture}
+
+The Smart Mirror system follows a layered client-server architecture with clear separation between presentation, application, domain services, and infrastructure layers.
+
+\subsection{Layered Architecture}
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.92\textwidth}{
+    \small
+    \textbf{Presentation Layer:} React + Vite + Tailwind CSS (Kiosk UI) \\[4pt]
+    \textbf{API Client Layer:} Axios (tryonApi, aiApi) \\[4pt]
+    \textbf{Application Layer:} Express routes + controllers \\[4pt]
+    \textbf{Domain Services:} tryOnInferenceService, replicateService, comfyTryOnService, ollamaService \\[4pt]
+    \textbf{Image/ML Utilities:} normalizeWebcamImage, tryOnFinalImageValidator, tryOnExhibitionFallbackChain, tryOnSmartPoseOverlay \\[4pt]
+    \textbf{Infrastructure:} MongoDB, static /dataset assets, environment configuration
+  }}
+  \caption{Layered architecture of the Smart Mirror system}
+  \label{fig:layered-architecture}
+\end{figure}
+
+\subsection{Repository Structure}
+
+\begin{lstlisting}[language={}, caption={Project directory structure}, label={lst:repo-structure}]
+smart-mirror/
+  backend/
+    server.js                 # Express app entry point
+    controllers/tryonController.js
+    routes/                   # tryon, catalog, ai, replicate
+    services/                 # replicate, inference, comfy, ollama
+    utils/                    # composites, validation, pose, metrics
+    models/Cloth.js
+    config/                   # env, loadEnv
+    scripts/                  # catalog import, replicate test
+  frontend/
+    src/
+      pages/Home.jsx          # Main kiosk state machine
+      components/flow/        # Camera, result steps
+      components/kiosk/       # Action dock, stylist
+      api/                    # tryonApi, aiApi
+      lib/                    # exhibition guards, mode flags
+    public/dataset/           # Garment PNG assets
+  docs/thesis/                # LaTeX thesis documentation
+\end{lstlisting}
+
+\section{End-to-End Processing Flow}
+\label{sec:processing-flow}
+
+The complete try-on session follows an asynchronous pattern optimized for exhibition deployments:
+
+\begin{enumerate}[leftmargin=*]
+  \item User selects garment and captures webcam photo on the frontend.
+  \item Frontend sends \texttt{POST /api/tryon} with \texttt{clothId} and \texttt{webcamImage}.
+  \item Backend validates inputs, normalizes webcam image, and optimizes person image for Replicate.
+  \item Backend resolves garment URL from MongoDB or dev catalog map.
+  \item Backend builds instant Sharp preview via \texttt{createDemoComposite}.
+  \item Backend creates async Replicate prediction and returns HTTP 202 with \texttt{predictionId} and preview.
+  \item Frontend displays instant preview and begins exponential backoff polling.
+  \item Backend polls Replicate; on success, validates output via \texttt{isValidFinalTryOnImage}.
+  \item If invalid, exhibition fallback chain produces deterministic composite.
+  \item Frontend receives validated final image and crossfades from preview to AI result.
+\end{enumerate}
+
+\section{Backend Implementation}
+\label{sec:backend-implementation}
+
+\subsection{Server Entry Point}
+
+The Express server (\texttt{server.js}) loads environment configuration, applies CORS and JSON middleware (25 MB body limit), serves static dataset assets, and mounts API routes. MongoDB connection is non-blocking---the HTTP server starts even if the database is unavailable, falling back to embedded mock catalog data.
+
+\subsection{Try-On Controller}
+
+The try-on controller (\texttt{controllers/tryonController.js}) orchestrates the complete request lifecycle:
+
+\begin{enumerate}[leftmargin=*]
+  \item Validate \texttt{clothId} and \texttt{webcamImage} presence and format.
+  \item Normalize webcam to data URL format.
+  \item Optimize person image dimensions and JPEG quality for Replicate upload.
+  \item Resolve garment image URL from MongoDB ObjectId or dev numeric catalog.
+  \item Branch to async Replicate path (HTTP 202) or sync inference path (HTTP 200).
+\end{enumerate}
+
+\subsection{Inference Service}
+
+The inference service (\texttt{services/tryOnInferenceService.js}) provides a single entry point for ML routing with the following priority:
+
+\begin{table}[H]
+  \centering
+  \caption{Inference routing priority}
+  \label{tab:inference-priority}
+  \begin{tabular}{@{}clp{8cm}@{}}
+    \toprule
+    \textbf{Priority} & \textbf{Condition} & \textbf{Behavior} \\
+    \midrule
+    1 & \texttt{AI\_TRYON\_SERVICE\_URL} set & POST to remote worker \\
+    2 & Replicate token + person + garment & \texttt{generateTryOn} \\
+    3 & Person only + exhibition fallback & Local exhibition chain \\
+    4 & Person + garment (no Replicate) & Return garment as processed \\
+    5 & No person image & Garment passthrough \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Replicate Service}
+
+The Replicate service manages cloud AI inference:
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Model selection:} CATVTON-Flux (requires HF token) or IDM-VTON based on environment configuration.
+  \item \textbf{Payload building:} Constructs model-specific inputs; inlines non-public garment URLs as base64.
+  \item \textbf{Async predictions:} Creates prediction jobs and registers metrics for polling.
+  \item \textbf{Sync polling:} Exponential backoff from 1s to 10s per iteration with configurable overall timeout.
+  \item \textbf{Output normalization:} Extracts result image URL from varying Replicate response shapes.
+  \item \textbf{Safe output:} Routes all outputs through \texttt{forceSafeTryOnOutput} and exhibition chain.
+\end{itemize}
+
+\section{Exhibition Fallback Chain}
+\label{sec:fallback-chain}
+
+The exhibition fallback chain (\texttt{utils/tryOnExhibitionFallbackChain.js}) implements ordered resolution to guarantee a valid output image:
+
+\begin{table}[H]
+  \centering
+  \caption{Exhibition fallback chain layers}
+  \label{tab:fallback-layers}
+  \begin{tabular}{@{}clp{8cm}@{}}
+    \toprule
+    \textbf{Layer} & \textbf{Method} & \textbf{Condition} \\
+    \midrule
+    L1 & Replicate candidate & Passes image validation heuristics \\
+    L2 & ComfyUI bridge/direct & \texttt{ENABLE\_COMFYUI} configured \\
+    L3 & MoveNet pose + Sharp & Pose detection succeeds \\
+    L4 & Sharp center composite & Always available (deterministic) \\
+    L5 & Placeholder PNG & Last resort neutral image \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\textbf{Design principle:} Cloud AI optimizes quality; local fallbacks optimize availability and demo continuity.
+
+\subsection{Image Validation}
+
+The validator (\texttt{utils/tryOnFinalImageValidator.js}) rejects:
+\begin{itemize}[leftmargin=*]
+  \item Empty or too-short image strings.
+  \item Invalid base64 payloads in data URLs.
+  \item Output equivalent to person or garment input (passthrough failure).
+  \item Images failing semantic heuristics when both references are available.
+\end{itemize}
+
+\subsection{Pose-Guided Compositing}
+
+MoveNet (TensorFlow.js CPU backend) detects shoulder and hip keypoints. The garment image is rotated and scaled to align with detected body geometry, then composited using Sharp's multiply blend mode. On pose detection failure, the system delegates to center-overlay compositing.
+
+\subsection{Demo Composite}
+
+The demo composite (\texttt{utils/tryOnDemoComposite.js}) resizes the person image (max width 1024px) and overlays the garment at a fixed torso band. This provides both the instant preview and the L4 fallback layer.
+
+\section{AI Models}
+\label{sec:ai-models}
+
+\subsection{CATVTON-Flux}
+
+\begin{itemize}[leftmargin=*]
+  \item Hosted on Replicate as \texttt{mmezhov/catvton-flux} with pinned version digest.
+  \item Requires Hugging Face token for FLUX license gating.
+  \item Configurable width, height, inference steps, guidance scale, and seed.
+  \item Preparation pipeline via \texttt{utils/catvtonPrepare.js}.
+\end{itemize}
+
+\subsection{IDM-VTON}
+
+\begin{itemize}[leftmargin=*]
+  \item Hosted on Replicate as \texttt{cuuupid/idm-vton}.
+  \item Inputs: \texttt{human\_img}, \texttt{garm\_img}, \texttt{category}.
+  \item Category values: \texttt{upper\_body}, \texttt{lower\_body}, \texttt{dresses}.
+  \item Category inferred from catalog metadata when not explicitly set.
+\end{itemize}
+
+\section{Frontend Implementation}
+\label{sec:frontend-implementation}
+
+\subsection{Technology Stack}
+
+\begin{itemize}[leftmargin=*]
+  \item React 18 with functional components and hooks.
+  \item Vite 5 for build tooling and development server.
+  \item Tailwind CSS 3 for utility-first styling.
+  \item Axios for HTTP client with 600-second timeout on try-on calls.
+\end{itemize}
+
+\subsection{Kiosk Flow State Machine}
+
+The main page (\texttt{pages/Home.jsx}) implements a step-based state machine:
+
+\begin{table}[H]
+  \centering
+  \caption{Kiosk UI flow steps}
+  \label{tab:ui-steps}
+  \begin{tabular}{@{}lp{10cm}@{}}
+    \toprule
+    \textbf{Step} & \textbf{User Experience} \\
+    \midrule
+    \texttt{gender} & Choose men or women \\
+    \texttt{browse} & Scroll and select garment from catalog rail \\
+    \texttt{preview} & View selected garment on mirror stage \\
+    \texttt{camera} & Webcam live feed with countdown capture \\
+    \texttt{result} & Try-on result with AI processing indicator \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Exhibition Mode}
+
+Exhibition mode (\texttt{lib/exhibitionMode.js}) is enabled by default and provides:
+\begin{itemize}[leftmargin=*]
+  \item Reduced blocking loaders during AI processing.
+  \item Silent recovery polling when main poll loop aborts.
+  \item Hidden outfit context on final result screen.
+  \item Suppressed error panels for public demonstration continuity.
+\end{itemize}
+
+\subsection{Session Isolation}
+
+Session isolation mechanisms (\texttt{lib/tryOnExhibitionGuards.js}) prevent cross-session corruption:
+
+\begin{table}[H]
+  \centering
+  \caption{Session isolation mechanisms}
+  \label{tab:session-isolation}
+  \begin{tabular}{@{}lp{10cm}@{}}
+    \toprule
+    \textbf{Mechanism} & \textbf{Purpose} \\
+    \midrule
+    \texttt{activePredictionId} / \texttt{dropStalePrediction} & Ignore late responses from prior sessions \\
+    \texttt{tryLockTryOnFinalImage} & First valid final URL wins per prediction \\
+    \texttt{resetTryOnFinalImageLocks} & Clean state on new outfit / reset \\
+    \texttt{cleanupExpiredLocks} & Memory hygiene for long-running kiosks \\
+    \texttt{aiRevealNonce} & Controlled crossfade preview $\rightarrow$ AI result \\
+    \texttt{AbortController} & Cancel poll loop when user navigates away \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{API Design}
+\label{sec:api-design}
+
+\subsection{Try-On Endpoint}
+
+\textbf{POST /api/tryon}
+
+\begin{table}[H]
+  \centering
+  \caption{Try-on API request and response}
+  \label{tab:tryon-api}
+  \small
+  \begin{tabular}{@{}llp{6cm}@{}}
+    \toprule
+    \textbf{Field} & \textbf{Type} & \textbf{Description} \\
+    \midrule
+    \texttt{clothId} & string/number & Required. MongoDB ObjectId or dev numeric ID \\
+    \texttt{webcamImage} & string & Data URL or base64 person image \\
+    \texttt{gender} & string & Optional catalog hint \\
+    \texttt{category} & string & Optional garment region for IDM-VTON \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\textbf{Responses:}
+\begin{itemize}[leftmargin=*]
+  \item HTTP 200: Sync inference complete with \texttt{processedImage}.
+  \item HTTP 202: Async Replicate started with \texttt{predictionId} and \texttt{previewImage}.
+  \item HTTP 400: Invalid input; HTTP 404: Unknown garment; HTTP 502--504: AI failures.
+\end{itemize}
+
+\subsection{Catalog Endpoint}
+
+\textbf{GET /api/catalog/items} --- Query parameters: \texttt{gender}, \texttt{category}, \texttt{q}, \texttt{limit}, \texttt{offset}. Returns \texttt{\{items, total\}} from MongoDB or mock catalog.
+
+\subsection{AI Stylist Endpoint}
+
+\textbf{POST /api/ai/stylist} --- Body: \texttt{\{prompt, gender?, category?\}}. Returns \texttt{\{result: string\}} from Ollama LLM with safe fallback text on failure.
+
+\section{Data Management}
+\label{sec:data-management}
+
+\subsection{MongoDB Schema}
+
+The \texttt{Cloth} model stores garment metadata:
+
+\begin{table}[H]
+  \centering
+  \caption{Cloth document schema}
+  \label{tab:cloth-schema}
+  \begin{tabular}{@{}llp{7cm}@{}}
+    \toprule
+    \textbf{Field} & \textbf{Type} & \textbf{Description} \\
+    \midrule
+    \texttt{name} & String & Display name \\
+    \texttt{gender} & String & men or women \\
+    \texttt{category} & String & shirts, outerwear, dresses, etc. \\
+    \texttt{imageUrl} & String & Path such as \texttt{/dataset/men/tops/...png} \\
+    \texttt{tags} & [String] & Optional search tags \\
+    \texttt{price} & Number & Optional display price \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Garment images remain on disk; the database stores only metadata and URL paths. Static assets are served from \texttt{frontend/public/dataset/} at the \texttt{/dataset/} URL path.
+
+\section{Security Considerations}
+\label{sec:security}
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Secret management:} Replicate API token, HuggingFace token, and MongoDB URI are server-side only.
+  \item \textbf{Input validation:} Image format and size validated before external API calls.
+  \item \textbf{Body size limit:} 25 MB JSON cap prevents memory exhaustion from oversized payloads.
+  \item \textbf{Trust proxy:} Express \texttt{trust proxy} enabled for reverse proxy deployment.
+  \item \textbf{CORS:} Configured for frontend origin access.
+\end{itemize}
+
+\section{Deployment Topology}
+\label{sec:deployment}
+
+\begin{figure}[H]
+  \centering
+  \fbox{\parbox{0.85\textwidth}{
+    \small
+    [Kiosk Browser] $\rightarrow$ HTTP $\rightarrow$ [Node Backend :5000] \\
+    \hspace{2cm} $\vdash$ MongoDB Atlas / local \\
+    \hspace{2cm} $\vdash$ Replicate HTTPS API \\
+    \hspace{2cm} $\vdash$ Optional ComfyUI bridge on LAN \\
+    \hspace{2cm} $\vdash$ Optional Ollama on localhost
+  }}
+  \caption{Recommended deployment topology}
+  \label{fig:deployment}
+\end{figure}
+
+Production deployment should use an HTTPS reverse proxy in front of the Node.js backend. The frontend is built with \texttt{npm run build} and served as static files or via the Vite preview server.

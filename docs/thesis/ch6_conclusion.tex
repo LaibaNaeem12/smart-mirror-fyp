@@ -1,0 +1,106 @@
+\chapter{Conclusion and Future Work}
+\label{ch:conclusion}
+
+\section{Summary}
+\label{sec:summary}
+
+This project designed and implemented the \textbf{Smart Mirror AI Virtual Try-On System}, an interactive kiosk-based platform for virtual garment visualization. The system successfully integrates state-of-the-art generative AI models (CATVTON-Flux and IDM-VTON via Replicate) with a multi-layer deterministic fallback chain to deliver a reliable try-on experience suitable for retail exhibitions and in-store demonstrations.
+
+The key contributions of this project are:
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Reliability envelope around cloud AI:} A five-layer exhibition fallback chain (Replicate $\rightarrow$ ComfyUI $\rightarrow$ MoveNet pose $\rightarrow$ Sharp composite $\rightarrow$ placeholder) ensures the kiosk never displays null, corrupt, or semantically wrong images.
+  \item \textbf{Instant preview mechanism:} Sharp compositing provides a visible try-on result within 2 seconds while async Replicate inference processes in the background.
+  \item \textbf{Session-safe async UI:} Frontend guards (\texttt{dropStalePrediction}, prediction locks, abort controllers) prevent stale async jobs from corrupting subsequent user sessions.
+  \item \textbf{Full-stack kiosk application:} Complete React frontend with guided flow, Express backend with REST APIs, MongoDB catalog management, and optional Ollama AI stylist.
+  \item \textbf{Environment-driven operability:} Model selection, timeout configuration, and fallback behavior controlled entirely through environment variables without code changes.
+\end{enumerate}
+
+\section{Objectives Achieved}
+\label{sec:objectives-achieved}
+
+All functional and non-functional objectives defined in Chapter~\ref{ch:introduction} have been achieved:
+
+\begin{table}[H]
+  \centering
+  \caption{Objectives achievement summary}
+  \label{tab:objectives-achieved}
+  \begin{tabular}{@{}clc@{}}
+    \toprule
+    \textbf{ID} & \textbf{Objective} & \textbf{Status} \\
+    \midrule
+    F1 & Catalog browsing by gender/category & Achieved \\
+    F2 & Webcam capture and normalization & Achieved \\
+    F3 & Virtual try-on (cloud + local fallbacks) & Achieved \\
+    F4 & Instant Sharp preview during async AI & Achieved \\
+    F5 & Async prediction polling & Achieved \\
+    F6 & Single final validated image display & Achieved \\
+    F7 & Optional Ollama AI stylist & Achieved \\
+    NF1 & Reliability via fallback chain & Achieved \\
+    NF2 & Session safety mechanisms & Achieved \\
+    NF3 & Environment-driven model selection & Achieved \\
+    NF4 & Server-side secret management & Achieved \\
+    NF5 & Exhibition mode for public demos & Achieved \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Current Limitations}
+\label{sec:limitations}
+
+Despite achieving its objectives, the system has the following limitations:
+
+\begin{enumerate}[leftmargin=*]
+  \item \textbf{Replicate dependency:} Live AI try-on requires internet connectivity, a Replicate account with credits, and tolerance for GPU queue variance.
+  \item \textbf{2D fallback fidelity:} Local Sharp and pose compositing produces approximate overlays, not physics-based cloth draping suitable for high-end fashion evaluation.
+  \item \textbf{Pose model accuracy:} MoveNet single-person detection is lighting-dependent; weak poses skip directly to center-overlay compositing.
+  \item \textbf{ComfyUI operational complexity:} While supported as an optional fallback layer, ComfyUI requires separate installation and workflow configuration.
+  \item \textbf{In-process metrics:} Prediction context maps are stored in server memory, not suitable for clustered multi-node deployment without external state management.
+  \item \textbf{No automated test suite:} Testing is manual; no CI/CD pipeline with unit or integration tests.
+\end{enumerate}
+
+\section{Future Work}
+\label{sec:future-work}
+
+The following enhancements are proposed for future development:
+
+\subsection{On-Device Inference}
+
+Deploy ONNX or TensorRT-optimized VTON models for offline boutique operation without cloud dependency. This would eliminate Replicate queue latency and enable deployment in venues with unreliable internet connectivity.
+
+\subsection{Advanced Garment Segmentation}
+
+Integrate Segment Anything Model (SAM) or human parsing models to generate precise garment masks, improving both AI model inputs and local compositing quality.
+
+\subsection{Multi-Garment Layering}
+
+Support trying on multiple garments simultaneously (e.g., jacket over shirt), requiring layered compositing and category-aware model inputs.
+
+\subsection{User Profiles and History}
+
+Implement privacy-compliant user profiles with try-on history, size preferences, and saved outfits. Requires authentication, data encryption, and GDPR-compliant storage.
+
+\subsection{Quantitative Quality Metrics}
+
+Introduce automated visual quality assessment using SSIM, LPIPS, or FID metrics to compare model outputs and fallback composites objectively.
+
+\subsection{Centralized Observability}
+
+Integrate OpenTelemetry or structured logging with a dashboard for monitoring prediction latency, fallback layer usage, and kiosk uptime across multiple deployment sites.
+
+\subsection{Automated Testing}
+
+Develop unit tests for validation utilities, integration tests for API endpoints, and end-to-end tests for the kiosk flow using Playwright or Cypress.
+
+\subsection{Mobile and AR Extension}
+
+Extend the platform to mobile browsers and augmented reality frameworks (WebXR) for smartphone-based virtual try-on outside the kiosk context.
+
+\section{Conclusion}
+\label{sec:conclusion-final}
+
+The Smart Mirror AI Virtual Try-On System demonstrates how research-grade virtual try-on APIs can be productized for real-world kiosk deployments. The core engineering contribution extends beyond integrating CATVTON and IDM-VTON via Replicate to building a comprehensive reliability envelope: validation, ordered fallbacks, instant previews, and session-safe async UI behavior.
+
+For exhibition and retail deployments, the perceived uptime of the mirror experience matters more than raw model fidelity. By treating invalid model outputs as expected events and routing them through deterministic Sharp and pose pipelines, the system delivers a continuous user-visible result suitable for thesis evaluation and operational demonstrations.
+
+The project successfully bridges the gap between academic VTON research and deployable retail technology, providing a foundation for future enhancements in on-device inference, advanced segmentation, and multi-garment visualization.

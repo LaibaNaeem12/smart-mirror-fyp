@@ -1,0 +1,13 @@
+\chapter*{Abstract}
+\addcontentsline{toc}{chapter}{Abstract}
+
+Virtual try-on technology enables shoppers to visualize how garments might appear on their body without physically wearing them. This project presents \textbf{Smart Mirror}, an interactive kiosk-based smart mirror system that integrates cloud-based generative AI models with deterministic local fallbacks to deliver a reliable virtual garment try-on experience suitable for retail stores, trade exhibitions, and academic demonstrations.
+
+The system comprises a React-based kiosk frontend and a Node.js/Express backend that orchestrates catalog management, webcam image capture, AI inference, and result validation. Primary virtual try-on is performed using state-of-the-art diffusion models---CATVTON-Flux and IDM-VTON---hosted on the Replicate cloud platform. To address the inherent unreliability of shared GPU inference (queue delays, timeouts, and semantically invalid outputs), the backend implements a multi-layer exhibition fallback chain comprising optional ComfyUI integration, MoveNet pose-guided Sharp compositing, and center-overlay Sharp compositing. A strict image validation layer ensures that the API never returns empty, corrupt, or incorrect images during public demonstrations.
+
+The frontend provides a guided step-by-step kiosk flow with asynchronous prediction polling, instant Sharp preview while cloud AI processes, and session isolation mechanisms that prevent stale predictions from corrupting subsequent user sessions. An optional Ollama-powered AI stylist assistant offers outfit recommendations through natural language interaction.
+
+Experimental evaluation demonstrates that the system maintains continuous user-visible output even when cloud AI services are slow or unavailable. The combination of generative quality from Replicate models and operational reliability from local fallbacks makes Smart Mirror a practical solution for deploying virtual try-on in real-world kiosk environments.
+
+\vspace{1cm}
+\noindent\textbf{Keywords:} Virtual try-on, Smart mirror, Replicate, CATVTON, IDM-VTON, Exhibition fallback, Sharp compositing, Pose estimation, Kiosk UI, Session isolation.

@@ -1,0 +1,253 @@
+\chapter{Software Requirements Specification}
+\label{ch:srs}
+
+\section{Introduction}
+\label{sec:srs-intro}
+
+This chapter presents the Software Requirements Specification (SRS) for the Smart Mirror AI Virtual Try-On System. It defines the functional and non-functional requirements, use cases, data requirements, and system constraints.
+
+\section{System Actors}
+\label{sec:actors}
+
+\begin{table}[H]
+  \centering
+  \caption{System actors and their roles}
+  \label{tab:actors}
+  \begin{tabular}{@{}lp{10cm}@{}}
+    \toprule
+    \textbf{Actor} & \textbf{Description} \\
+    \midrule
+    Shopper / Demo User & End user who browses catalog, captures photo, and views try-on result \\
+    Kiosk Browser & React SPA running on the smart mirror display \\
+    Express Backend & Node.js server orchestrating all business logic \\
+    Replicate Cloud & External GPU inference service for VTON models \\
+    MongoDB & Database storing garment catalog metadata \\
+    Ollama LLM & Optional local language model for stylist assistant \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Functional Requirements}
+\label{sec:functional-requirements}
+
+\subsection{Catalog Management (FR-CAT)}
+
+\begin{table}[H]
+  \centering
+  \caption{Catalog management functional requirements}
+  \label{tab:fr-catalog}
+  \small
+  \begin{tabular}{@{}p{1.5cm}p{12cm}@{}}
+    \toprule
+    \textbf{ID} & \textbf{Requirement} \\
+    \midrule
+    FR-CAT-01 & The system shall display garments organized by gender (men/women). \\
+    FR-CAT-02 & The system shall filter garments by category (tops, outerwear, dresses, etc.). \\
+    FR-CAT-03 & The system shall load catalog items from MongoDB via REST API. \\
+    FR-CAT-04 & The system shall serve an embedded mock catalog when MongoDB is unavailable. \\
+    FR-CAT-05 & The system shall display garment images from static assets at \texttt{/dataset/}. \\
+    FR-CAT-06 & The system shall support catalog search by query string. \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Virtual Try-On (FR-TRY)}
+
+\begin{table}[H]
+  \centering
+  \caption{Virtual try-on functional requirements}
+  \label{tab:fr-tryon}
+  \small
+  \begin{tabular}{@{}p{1.5cm}p{12cm}@{}}
+    \toprule
+    \textbf{ID} & \textbf{Requirement} \\
+    \midrule
+    FR-TRY-01 & The system shall capture a still frame from the user's webcam. \\
+    FR-TRY-02 & The system shall send the webcam image and selected garment ID to the backend. \\
+    FR-TRY-03 & The system shall normalize webcam images to data URL format server-side. \\
+    FR-TRY-04 & The system shall run virtual try-on via Replicate cloud models (CATVTON or IDM-VTON). \\
+    FR-TRY-05 & The system shall return an instant Sharp composite preview during async AI processing. \\
+    FR-TRY-06 & The system shall poll async Replicate predictions until completion. \\
+    FR-TRY-07 & The system shall validate AI output and reject semantically invalid images. \\
+    FR-TRY-08 & The system shall fall back to local compositing when cloud AI fails or times out. \\
+    FR-TRY-09 & The system shall display exactly one final processed image on the result screen. \\
+    FR-TRY-10 & The system shall allow the user to start a new outfit session from the result screen. \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{AI Stylist Assistant (FR-AI)}
+
+\begin{table}[H]
+  \centering
+  \caption{AI stylist functional requirements}
+  \label{tab:fr-ai}
+  \small
+  \begin{tabular}{@{}p{1.5cm}p{12cm}@{}}
+    \toprule
+    \textbf{ID} & \textbf{Requirement} \\
+    \midrule
+    FR-AI-01 & The system shall provide an optional floating stylist assistant interface. \\
+    FR-AI-02 & The system shall accept natural language outfit queries from the user. \\
+    FR-AI-03 & The system shall generate stylist recommendations via Ollama LLM. \\
+    FR-AI-04 & The system shall return safe fallback text when Ollama is unreachable. \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Non-Functional Requirements}
+\label{sec:nonfunctional-requirements}
+
+\begin{table}[H]
+  \centering
+  \caption{Non-functional requirements}
+  \label{tab:nfr}
+  \small
+  \begin{tabular}{@{}p{1.5cm}p{12cm}@{}}
+    \toprule
+    \textbf{ID} & \textbf{Requirement} \\
+    \midrule
+    NFR-01 & Try-on preview shall appear within 2 seconds of image submission. \\
+    NFR-02 & The system shall never return null or corrupt images to the frontend. \\
+    NFR-03 & Stale async predictions shall not overwrite images from new user sessions. \\
+    NFR-04 & API tokens (Replicate, HuggingFace) shall remain server-side only. \\
+    NFR-05 & The system shall support JSON request bodies up to 25 MB for webcam images. \\
+    NFR-06 & The system shall operate with MongoDB offline using mock catalog data. \\
+    NFR-07 & Exhibition mode shall suppress failure-heavy error panels from public view. \\
+    NFR-08 & The backend shall start HTTP server even if MongoDB connection fails. \\
+    NFR-09 & Replicate polling shall use exponential backoff (1s to 10s per iteration). \\
+    NFR-10 & Overall Replicate timeout shall be configurable (default 420 seconds). \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{Use Cases}
+\label{sec:use-cases}
+
+\subsection{UC-01: Complete Virtual Try-On Session}
+
+\textbf{Primary Actor:} Shopper
+
+\textbf{Preconditions:} Kiosk application is running; backend server is accessible; catalog is loaded.
+
+\textbf{Main Flow:}
+\begin{enumerate}[leftmargin=*]
+  \item User selects gender (men or women).
+  \item User browses catalog and selects a garment.
+  \item User views garment preview on the mirror stage.
+  \item User proceeds to camera step; webcam captures a still frame.
+  \item Frontend sends try-on request with \texttt{clothId} and \texttt{webcamImage}.
+  \item Backend returns instant Sharp preview (HTTP 202) or final image (HTTP 200).
+  \item Frontend polls prediction status until Replicate succeeds.
+  \item Validated AI image replaces preview via crossfade animation.
+  \item User views final try-on result.
+  \item User may start a new outfit session.
+\end{enumerate}
+
+\textbf{Alternate Flows:}
+\begin{itemize}[leftmargin=*]
+  \item \textbf{3a.} Replicate is unavailable: backend uses exhibition fallback chain; user sees composite result.
+  \item \textbf{3b.} Replicate returns invalid output: validator rejects output; fallback chain produces composite.
+  \item \textbf{3c.} User clicks ``New Outfit'' during polling: stale prediction is dropped; session resets.
+\end{itemize}
+
+\subsection{UC-02: Browse Catalog Without Try-On}
+
+\textbf{Primary Actor:} Shopper
+
+\textbf{Main Flow:}
+\begin{enumerate}[leftmargin=*]
+  \item User selects gender.
+  \item User scrolls through garment grid filtered by category tabs.
+  \item User selects a garment to view preview.
+\end{enumerate}
+
+\subsection{UC-03: AI Stylist Consultation}
+
+\textbf{Primary Actor:} Shopper
+
+\textbf{Main Flow:}
+\begin{enumerate}[leftmargin=*]
+  \item User opens the floating stylist assistant.
+  \item User types a natural language query (e.g., ``Suggest a casual summer outfit'').
+  \item Backend forwards query to Ollama LLM.
+  \item Stylist response is displayed in the assistant panel.
+\end{enumerate}
+
+\section{Data Requirements}
+\label{sec:data-requirements}
+
+\subsection{Input Data}
+
+\begin{table}[H]
+  \centering
+  \caption{Input data specifications}
+  \label{tab:input-data}
+  \begin{tabular}{@{}llp{7cm}@{}}
+    \toprule
+    \textbf{Field} & \textbf{Format} & \textbf{Description} \\
+    \midrule
+    Person image & \texttt{data:image/jpeg;base64,...} & Webcam capture, normalized server-side \\
+    Garment image & HTTPS URL or data URL & Resolved from catalog \texttt{imageUrl} \\
+    Cloth ID & MongoDB ObjectId or numeric & Identifies catalog garment record \\
+    Gender & String (men/women) & Catalog filtering hint \\
+    Category & String & Garment region for IDM-VTON \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Output Data}
+
+\begin{table}[H]
+  \centering
+  \caption{Output data specifications}
+  \label{tab:output-data}
+  \begin{tabular}{@{}llp{7cm}@{}}
+    \toprule
+    \textbf{Field} & \textbf{Format} & \textbf{Description} \\
+    \midrule
+    Processed image & Data URL (JPEG/PNG) & Final try-on composite \\
+    Original image & Data URL & Normalized person image \\
+    Prediction ID & String & Replicate async job identifier \\
+    Status & Enum & \texttt{success}, \texttt{fallback}, \texttt{instant\_preview} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\section{System Constraints}
+\label{sec:constraints}
+
+\begin{itemize}[leftmargin=*]
+  \item \textbf{Hardware:} Standard PC with webcam, display (kiosk), and network connectivity.
+  \item \textbf{Software:} Node.js 18+, MongoDB 6+, modern Chromium-based browser.
+  \item \textbf{Network:} Internet access required for Replicate cloud inference.
+  \item \textbf{API Keys:} Replicate API token required for live AI try-on; HuggingFace token for CATVTON.
+  \item \textbf{Browser:} WebRTC support required for webcam capture.
+\end{itemize}
+
+\section{External Interface Requirements}
+\label{sec:interfaces}
+
+\subsection{User Interface}
+
+The kiosk UI follows a step-based flow: gender selection $\rightarrow$ catalog browsing $\rightarrow$ garment preview $\rightarrow$ camera capture $\rightarrow$ try-on result. The interface is optimized for touch interaction on large displays with minimal text input.
+
+\subsection{API Interface}
+
+RESTful JSON APIs exposed by the Express backend:
+
+\begin{itemize}[leftmargin=*]
+  \item \texttt{POST /api/tryon} --- Submit try-on request
+  \item \texttt{GET /api/tryon/status/:predictionId} --- Poll prediction status
+  \item \texttt{GET /api/catalog/items} --- Fetch catalog with filters
+  \item \texttt{POST /api/ai/stylist} --- AI stylist query
+  \item \texttt{GET /api/replicate/health-test} --- Replicate connectivity probe
+\end{itemize}
+
+\subsection{Hardware Interface}
+
+\begin{itemize}[leftmargin=*]
+  \item Webcam via browser MediaDevices API (WebRTC).
+  \item Touch display for kiosk interaction.
+  \item Network interface for backend and Replicate API communication.
+\end{itemize}

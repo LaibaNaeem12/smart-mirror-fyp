@@ -1,0 +1,23 @@
+[
+  {"id": 1, "name": "Classic Oxford Shirt", "category": "men", "imageUrl": "/images/men/1.png"},
+  {"id": 2, "name": "Navy Two-Piece Suit", "category": "men", "imageUrl": "/images/men/2.png"},
+  {"id": 3, "name": "Casual Henley Tee", "category": "men", "imageUrl": "/images/men/3.png"},
+  {"id": 4, "name": "Slim Fit Jeans", "category": "men", "imageUrl": "/images/men/4.png"},
+  {"id": 5, "name": "Tailored Chinos", "category": "men", "imageUrl": "/images/men/5.png"},
+  {"id": 6, "name": "Formal Waistcoat", "category": "men", "imageUrl": "/images/men/6.png"},
+  {"id": 7, "name": "Corduroy Overshirt", "category": "men", "imageUrl": "/images/men/7.png"},
+  {"id": 8, "name": "Traditional Kurta", "category": "men", "imageUrl": "/images/men/8.png"},
+  {"id": 9, "name": "Lightweight Hoodie", "category": "men", "imageUrl": "/images/men/9.png"},
+  {"id": 10, "name": "Wool Overcoat", "category": "men", "imageUrl": "/images/men/10.png"},
+
+  {"id": 11, "name": "Silk Blouse", "category": "women", "imageUrl": "/images/women/11.png"},
+  {"id": 12, "name": "A-Line Midi Dress", "category": "women", "imageUrl": "/images/women/12.png"},
+  {"id": 13, "name": "Chiffon Evening Gown", "category": "women", "imageUrl": "/images/women/13.png"},
+  {"id": 14, "name": "High-Waist Trousers", "category": "women", "imageUrl": "/images/women/14.png"},
+  {"id": 15, "name": "Denim Jacket", "category": "women", "imageUrl": "/images/women/15.png"},
+  {"id": 16, "name": "Casual Wrap Top", "category": "women", "imageUrl": "/images/women/16.png"},
+  {"id": 17, "name": "Traditional Sari", "category": "women", "imageUrl": "/images/women/17.png"},
+  {"id": 18, "name": "Pleated Skirt", "category": "women", "imageUrl": "/images/women/18.png"},
+  {"id": 19, "name": "Blazer Dress", "category": "women", "imageUrl": "/images/women/19.png"},
+  {"id": 20, "name": "Knit Cardigan", "category": "women", "imageUrl": "/images/women/20.png"}
+]
